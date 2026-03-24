@@ -22,9 +22,7 @@ func NewOrderCallbackQueue(order *mdb.Orders) (*asynq.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return asynq.NewTask(QueueOrderCallback, payload,
-		asynq.Retention(config.GetOrderExpirationTimeDuration()),
-	), nil
+	return asynq.NewTask(QueueOrderCallback, payload), nil
 }
 
 func OrderCallbackHandle(ctx context.Context, t *asynq.Task) error {

@@ -5,9 +5,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/assimon/luuu/config"
-	"github.com/spf13/viper"
-
 	"github.com/assimon/luuu/model/data"
 	"github.com/assimon/luuu/model/request"
 	"github.com/assimon/luuu/mq"
@@ -20,6 +17,7 @@ import (
 	"github.com/gookit/goutil/stdutil"
 	"github.com/hibiken/asynq"
 	"github.com/shopspring/decimal"
+	"github.com/spf13/viper"
 )
 
 const UsdtTrc20ApiUri = "https://apilist.tronscanapi.com/api/transfer/trc20"
@@ -140,9 +138,7 @@ func Trc20CallBack(token string, wg *sync.WaitGroup) {
 		// 回调队列
 		orderCallbackQueue, _ := handle.NewOrderCallbackQueue(order)
 		orderNoticeMaxRetry := viper.GetInt("order_notice_max_retry")
-		mq.MClient.Enqueue(orderCallbackQueue, asynq.MaxRetry(orderNoticeMaxRetry),
-			asynq.Retention(config.GetOrderExpirationTimeDuration()),
-		)
+		mq.MClient.Enqueue(orderCallbackQueue, asynq.MaxRetry(orderNoticeMaxRetry))
 		// mq.MClient.Enqueue(orderCallbackQueue, asynq.MaxRetry(5))
 		// 发送机器人消息
 		msgTpl := `

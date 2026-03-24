@@ -96,9 +96,7 @@ func CreateTransaction(req *request.CreateTransactionRequest) (*response.CreateT
 	tx.Commit()
 	// 超时过期消息队列
 	orderExpirationQueue, _ := handle.NewOrderExpirationQueue(order.TradeId)
-	mq.MClient.Enqueue(orderExpirationQueue, asynq.ProcessIn(config.GetOrderExpirationTimeDuration()),
-		asynq.Retention(config.GetOrderExpirationTimeDuration()),
-	)
+	mq.MClient.Enqueue(orderExpirationQueue, asynq.ProcessIn(config.GetOrderExpirationTimeDuration()))
 	ExpirationTime := carbon.Now().AddMinutes(config.GetOrderExpirationTime()).Timestamp()
 	resp := &response.CreateTransactionResponse{
 		TradeId:        order.TradeId,

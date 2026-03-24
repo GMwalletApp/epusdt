@@ -3,7 +3,6 @@ package handle
 import (
 	"context"
 
-	"github.com/assimon/luuu/config"
 	"github.com/assimon/luuu/model/data"
 	"github.com/assimon/luuu/model/mdb"
 	"github.com/hibiken/asynq"
@@ -12,9 +11,7 @@ import (
 const QueueOrderExpiration = "order:expiration"
 
 func NewOrderExpirationQueue(tradeId string) (*asynq.Task, error) {
-	return asynq.NewTask(QueueOrderExpiration, []byte(tradeId),
-		asynq.Retention(config.GetOrderExpirationTimeDuration()),
-	), nil
+	return asynq.NewTask(QueueOrderExpiration, []byte(tradeId)), nil
 }
 
 // OrderExpirationHandle 设置订单过期
