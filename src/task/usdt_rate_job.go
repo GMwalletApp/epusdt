@@ -6,6 +6,7 @@ import (
 	"github.com/assimon/luuu/util/json"
 	"github.com/assimon/luuu/util/log"
 	"github.com/assimon/luuu/util/math"
+	"sort"
 	"time"
 )
 
@@ -53,9 +54,15 @@ func (r UsdtRateJob) Run() {
 		log.Sugar.Error("usdt resp err:", usdtResp.Status.ErrorMessage)
 		return
 	}
-	for _, points := range usdtResp.Data.Points {
-		if len(points.C) > 0 && points.C[0] > 0 {
-			config.UsdtRate = math.MustParsePrecFloat64(points.C[0], 2)
+	keys := make([]string, 0, len(usdtResp.Data.Points))
+	for index, _ := range usdtResp.Data.Points {
+		keys = append(keys, index)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+
+	for _, k := range keys {
+		if len(usdtResp.Data.Points[k].C) > 0 && usdtResp.Data.Points[k].C[0] > 0 {
+			config.UsdtRate = math.MustParsePrecFloat64(usdtResp.Data.Points[k].C[0], 2)
 			return
 		}
 	}
