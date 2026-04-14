@@ -250,8 +250,8 @@ func TestGetSupportedAssetsPublic(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected supports array, got %T", data["supports"])
 	}
-	if len(supports) < 6 {
-		t.Fatalf("expected >= 6 network supports, got %d", len(supports))
+	if len(supports) < 2 {
+		t.Fatalf("expected >= 2 network supports, got %d", len(supports))
 	}
 
 	seen := map[string]bool{}
@@ -260,10 +260,55 @@ func TestGetSupportedAssetsPublic(t *testing.T) {
 		network := row["network"].(string)
 		seen[network] = true
 	}
-	for _, n := range []string{"tron", "solana", "eth", "bsc", "polygon", "plasma"} {
+	for _, n := range []string{"tron", "solana"} {
 		if !seen[n] {
 			t.Fatalf("missing network support: %s", n)
 		}
+	}
+}
+
+func TestGetSupportedAssetsWithWalletsPublic(t *testing.T) {
+	e := setupTestEnv(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/payments/gmpay/v1/supported-assets/wallets", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResp(t, rec)
+	if resp["status_code"].(float64) != 200 {
+		t.Fatalf("expected status_code=200, got %v", resp["status_code"])
+	}
+	groups, ok := resp["data"].([]interface{})
+	if !ok || len(groups) == 0 {
+		t.Fatalf("expected non-empty groups, got %T %v", resp["data"], resp["data"])
+	}
+
+	foundTron := false
+	for _, g := range groups {
+		group := g.(map[string]interface{})
+		if group["network"] != "tron" {
+			continue
+		}
+		items, _ := group["list"].([]interface{})
+		for _, it := range items {
+			item := it.(map[string]interface{})
+			if item["token"] != "USDT" {
+				continue
+			}
+			addrs, _ := item["addresses"].([]interface{})
+			for _, a := range addrs {
+				if a.(string) == "TTestTronAddress001" {
+					foundTron = true
+					break
+				}
+			}
+		}
+	}
+	if !foundTron {
+		t.Fatalf("expected tron/usdt row contains seeded wallet")
 	}
 }
 

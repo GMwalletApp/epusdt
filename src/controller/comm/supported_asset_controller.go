@@ -53,6 +53,68 @@ func (c *BaseCommController) GetSupportedAssets(ctx echo.Context) error {
 	return c.SucJson(ctx, response.SupportedAssetsResponse{Supports: supports})
 }
 
+// GetSupportedAssetsWithWallets 对外公开支持的链+token+钱包地址（地址从 wallet_address 读取，仅启用钱包）。
+func (c *BaseCommController) GetSupportedAssetsWithWallets(ctx echo.Context) error {
+	assets, err := data.ListEnabledSupportedAssets()
+	if err != nil {
+		return c.FailJson(ctx, err)
+	}
+	wallets, err := data.GetAvailableWalletAddress()
+	if err != nil {
+		return c.FailJson(ctx, err)
+	}
+
+	addrMap := make(map[string][]string)
+	for _, w := range wallets {
+		addrMap[w.Network] = append(addrMap[w.Network], w.Address)
+	}
+	for network := range addrMap {
+		sort.Strings(addrMap[network])
+	}
+
+	flat := make([]response.NetworkTokenAddressSupport, 0, len(assets))
+	for _, a := range assets {
+		flat = append(flat, response.NetworkTokenAddressSupport{
+			Network:   a.Network,
+			Token:     a.Token,
+			Addresses: addrMap[a.Network],
+		})
+	}
+
+	groupMap := make(map[string][]response.TokenAddressItem)
+	for _, row := range flat {
+		groupMap[row.Network] = append(groupMap[row.Network], response.TokenAddressItem{
+			Token:     row.Token,
+			Addresses: row.Addresses,
+		})
+	}
+
+	networks := make([]string, 0, len(groupMap))
+	for network := range groupMap {
+		networks = append(networks, network)
+	}
+	sort.Strings(networks)
+
+	groups := make([]response.NetworkTokenAddressGroup, 0, len(networks))
+	for _, network := range networks {
+		items := groupMap[network]
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].Token < items[j].Token
+		})
+		groups = append(groups, response.NetworkTokenAddressGroup{
+			Network: network,
+			List:    items,
+		})
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].Network == groups[j].Network {
+			return len(groups[i].List) < len(groups[j].List)
+		}
+		return groups[i].Network < groups[j].Network
+	})
+	return c.SucJson(ctx, groups)
+}
+
 // ListSupportedAssetRecords 查询支持项明细（无需鉴权）。
 func (c *BaseCommController) ListSupportedAssetRecords(ctx echo.Context) error {
 	network := ctx.QueryParam("network")
