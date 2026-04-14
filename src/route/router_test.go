@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/assimon/luuu/config"
 	"github.com/assimon/luuu/model/dao"
 	"github.com/assimon/luuu/model/mdb"
 	"github.com/assimon/luuu/util/log"
@@ -36,6 +38,8 @@ func setupTestEnv(t *testing.T) *echo.Echo {
 	viper.Set("log_save_path", tmpDir)
 	viper.Set("sqlite_database_filename", tmpDir+"/test.db")
 	viper.Set("runtime_sqlite_filename", tmpDir+"/runtime.db")
+
+	config.StaticFilePath = "/tmp/epusdt-src/src/static"
 
 	log.Init()
 
@@ -205,6 +209,21 @@ func parseResp(t *testing.T, rec *httptest.ResponseRecorder) map[string]interfac
 		t.Fatalf("unmarshal: %v", err)
 	}
 	return resp
+}
+
+func extractPaymentOptions(t *testing.T, body string) []map[string]string {
+	t.Helper()
+	re := regexp.MustCompile(`(?m)^\s*var PAYMENT_OPTIONS = (.+);$`)
+	match := re.FindStringSubmatch(body)
+	if len(match) != 2 {
+		t.Fatalf("payment options script not found in body: %s", body)
+	}
+
+	var options []map[string]string
+	if err := json.Unmarshal([]byte(match[1]), &options); err != nil {
+		t.Fatalf("unmarshal payment options: %v", err)
+	}
+	return options
 }
 
 // TestWalletAddAndList tests adding wallets via API and listing them.
@@ -399,5 +418,42 @@ func TestCreateOrderNetworkIsolation(t *testing.T) {
 	}
 	if data["receive_address"] != "SolTestAddress001" {
 		t.Errorf("expected SolTestAddress001, got %v", data["receive_address"])
+	}
+}
+
+func TestCheckoutCounterPageAdvertisesOnlyConfiguredNetworks(t *testing.T) {
+	e := setupTestEnv(t)
+
+	if err := dao.Mdb.Model(&mdb.WalletAddress{}).
+		Where("network = ?", mdb.NetworkSolana).
+		Update("status", mdb.TokenStatusDisable).Error; err != nil {
+		t.Fatalf("disable solana wallets: %v", err)
+	}
+
+	body := signBody(map[string]interface{}{
+		"order_id":   "checkout-page-1",
+		"amount":     1.00,
+		"token":      "usdt",
+		"currency":   "cny",
+		"network":    "tron",
+		"notify_url": "http://localhost/notify",
+	})
+	rec := doPost(e, "/payments/gmpay/v1/order/create-transaction", body)
+	resp := parseResp(t, rec)
+	data := resp["data"].(map[string]interface{})
+	tradeID := data["trade_id"].(string)
+
+	req := httptest.NewRequest(http.MethodGet, "/pay/checkout-counter/"+tradeID, nil)
+	page := httptest.NewRecorder()
+	e.ServeHTTP(page, req)
+
+	options := extractPaymentOptions(t, page.Body.String())
+	if len(options) == 0 {
+		t.Fatal("expected at least one payment option")
+	}
+	for _, option := range options {
+		if option["network"] != "tron" {
+			t.Fatalf("expected only tron payment options, got %#v", options)
+		}
 	}
 }

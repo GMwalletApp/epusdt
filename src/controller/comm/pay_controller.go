@@ -17,14 +17,33 @@ import (
 func (c *BaseCommController) CheckoutCounter(ctx echo.Context) (err error) {
 	tradeId := ctx.Param("trade_id")
 	resp, err := service.GetCheckoutCounterByTradeId(tradeId)
+
+	type checkoutCounterPageData struct {
+		response.CheckoutCounterResponse
+		PaymentOptionsJSON template.JS
+	}
+	buildPageData := func(resp response.CheckoutCounterResponse) (checkoutCounterPageData, error) {
+		paymentOptionsJSON, err := json.Marshal(resp.PaymentOptions)
+		if err != nil {
+			return checkoutCounterPageData{}, err
+		}
+		return checkoutCounterPageData{
+			CheckoutCounterResponse: resp,
+			PaymentOptionsJSON:      template.JS(string(paymentOptionsJSON)),
+		}, nil
+	}
+
 	if err != nil {
 		if err == service.ErrOrder {
 			tmpl, err := template.ParseFiles(filepath.Join(config.StaticFilePath, "index.html"))
 			if err != nil {
 				return ctx.String(http.StatusOK, err.Error())
 			}
-			emptyResp := response.CheckoutCounterResponse{}
-			return tmpl.Execute(ctx.Response(), emptyResp)
+			pageData, err := buildPageData(response.CheckoutCounterResponse{})
+			if err != nil {
+				return ctx.String(http.StatusOK, err.Error())
+			}
+			return tmpl.Execute(ctx.Response(), pageData)
 		}
 		return ctx.String(http.StatusOK, err.Error())
 	}
@@ -39,7 +58,11 @@ func (c *BaseCommController) CheckoutCounter(ctx echo.Context) (err error) {
 	}
 	fmt.Printf("%v\n", string(jsonByte))
 
-	return tmpl.Execute(ctx.Response(), resp)
+	pageData, err := buildPageData(*resp)
+	if err != nil {
+		return ctx.String(http.StatusOK, err.Error())
+	}
+	return tmpl.Execute(ctx.Response(), pageData)
 }
 
 // CheckStatus 支付状态检测

@@ -676,12 +676,12 @@ async function confirmStep1() {
       history.replaceState(null, '', _url.toString());
       renderOrderId();
     }
-    ORDER.token          = data?.token           ?? opt.token;
-    ORDER.network        = data?.network         ?? opt.network;
-    ORDER.actualAmount   = data?.actual_amount   != null ? String(data.actual_amount) : opt.actualAmount;
+    ORDER.token          = data?.token           ?? opt.token ?? ORDER.token;
+    ORDER.network        = data?.network         ?? opt.network ?? ORDER.network;
+    ORDER.actualAmount   = data?.actual_amount   != null ? String(data.actual_amount) : ORDER.actualAmount;
     ORDER.amount         = data?.amount          != null ? String(data.amount)         : ORDER.amount;
     ORDER.currency       = data?.currency        ?? ORDER.currency;
-    ORDER.receiveAddress = data?.receive_address ?? opt.receiveAddress;
+    ORDER.receiveAddress = data?.receive_address ?? ORDER.receiveAddress;
     if (data?.expiration_time != null) ORDER.expirationTime = String(data.expiration_time);
     if (data?.created_at      != null) ORDER.createdAt      = String(data.created_at);
     if (data?.redirect_url)            ORDER.redirectUrl    = data.redirect_url;
@@ -939,15 +939,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   renderOrderId();
 
-  // 确保 PAYMENT_OPTIONS 存在（服务端未注入时降级为内置默认选项）
   if (typeof PAYMENT_OPTIONS === 'undefined' || !Array.isArray(PAYMENT_OPTIONS) || !PAYMENT_OPTIONS.length) {
     window.PAYMENT_OPTIONS = [
-      { token: 'USDT', network: 'TRON',     actualAmount: ORDER.actualAmount, receiveAddress: ORDER.receiveAddress },
-      { token: 'TRX',  network: 'TRON',     actualAmount: ORDER.actualAmount, receiveAddress: ORDER.receiveAddress },
-      { token: 'USDT', network: 'Solana',   actualAmount: ORDER.actualAmount, receiveAddress: ORDER.receiveAddress },
-      { token: 'USDC', network: 'Solana',   actualAmount: ORDER.actualAmount, receiveAddress: ORDER.receiveAddress },
-      { token: 'USDT', network: 'Ethereum', actualAmount: ORDER.actualAmount, receiveAddress: ORDER.receiveAddress },
-      { token: 'USDC', network: 'Ethereum', actualAmount: ORDER.actualAmount, receiveAddress: ORDER.receiveAddress },
+      { token: ORDER.token, network: ORDER.network },
     ];
   }
 
@@ -968,5 +962,3 @@ document.addEventListener('DOMContentLoaded', () => {
   const walletBtn = $('btn-connect-wallet');
   if (walletBtn) walletBtn.style.display = CONFIG.wallet.enabled ? '' : 'none';
 });
-
-
