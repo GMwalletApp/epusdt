@@ -374,6 +374,80 @@ func TryProcessEvmERC20Transfer(chainNetwork string, contract common.Address, to
 	log.Sugar.Infof("[%s-%s][%s] payment processed trade_id=%s hash=%s", net, tokenSym, walletAddr, tradeID, txHash)
 }
 
+// TryProcessTronTRC20Transfer 处理 Tron 链上 TRC20-USDT 的 Transfer 入账。
+func TryProcessTronTRC20Transfer(toAddr string, rawValue *big.Int, txHash string, blockTsMs int64) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Sugar.Errorf("[TRON-WS] TryProcessTronTRC20Transfer panic: %v", err)
+		}
+	}()
+
+	walletAddr := strings.TrimSpace(toAddr)
+	if walletAddr == "" {
+		return
+	}
+	if rawValue == nil || rawValue.Sign() <= 0 {
+		log.Sugar.Infof("[TRON-USDT][%s] skip non-positive or nil amount", walletAddr)
+		return
+	}
+
+	decimalQuant := decimal.NewFromBigInt(rawValue, 0)
+	amount := math.MustParsePrecFloat64(decimalQuant.Div(decimal.NewFromInt(1_000_000)).InexactFloat64(), 2)
+	if amount <= 0 {
+		log.Sugar.Warnf("[TRON-USDT][%s] skip non-positive amount %.2f", walletAddr, amount)
+		return
+	}
+
+	tradeID, err := data.GetTradeIdByWalletAddressAndAmountAndToken(mdb.NetworkTron, walletAddr, "USDT", amount)
+	if err != nil {
+		log.Sugar.Warnf("[TRON-USDT][%s] lock lookup: %v", walletAddr, err)
+		return
+	}
+	if tradeID == "" {
+		log.Sugar.Debugf("[TRON-USDT][%s] skip unmatched tx hash=%s amount=%.2f", walletAddr, txHash, amount)
+		return
+	}
+
+	order, err := data.GetOrderInfoByTradeId(tradeID)
+	if err != nil {
+		log.Sugar.Warnf("[TRON-USDT][%s] load order: %v", walletAddr, err)
+		return
+	}
+	if blockTsMs > 0 && blockTsMs < order.CreatedAt.TimestampMilli() {
+		log.Sugar.Warnf("[TRON-USDT][%s] skip tx %s because block time %d is before order create time %d", walletAddr, txHash, blockTsMs, order.CreatedAt.TimestampMilli())
+		return
+	}
+	if strings.ToLower(strings.TrimSpace(order.Network)) != mdb.NetworkTron {
+		log.Sugar.Warnf("[TRON-USDT][%s] skip trade_id=%s network=%q", walletAddr, tradeID, order.Network)
+		return
+	}
+	if strings.ToUpper(strings.TrimSpace(order.Token)) != "USDT" {
+		log.Sugar.Warnf("[TRON-USDT][%s] skip trade_id=%s token mismatch order=%s", walletAddr, tradeID, order.Token)
+		return
+	}
+
+	req := &request.OrderProcessingRequest{
+		ReceiveAddress:     walletAddr,
+		Token:              "USDT",
+		Network:            mdb.NetworkTron,
+		TradeId:            tradeID,
+		Amount:             amount,
+		BlockTransactionId: txHash,
+	}
+	err = OrderProcessing(req)
+	if err != nil {
+		if errors.Is(err, constant.OrderBlockAlreadyProcess) || errors.Is(err, constant.OrderStatusConflict) {
+			log.Sugar.Infof("[TRON-USDT][%s] skip resolved trade_id=%s hash=%s err=%v", walletAddr, tradeID, txHash, err)
+			return
+		}
+		log.Sugar.Errorf("[TRON-USDT][%s] OrderProcessing: %v", walletAddr, err)
+		return
+	}
+
+	sendPaymentNotification(order)
+	log.Sugar.Infof("[TRON-USDT][%s] payment processed trade_id=%s hash=%s", walletAddr, tradeID, txHash)
+}
+
 func sendPaymentNotification(order *mdb.Orders) {
 	msg := fmt.Sprintf(
 		"🎉 <b>收款成功通知</b>\n\n"+

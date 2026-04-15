@@ -58,7 +58,7 @@ func StartBscWebSocketListener() {
 		Topics: [][]common.Hash{},
 	}
 
-	runEvmWsLogListener("[BSC-WS]", wsURL, query, func(client *ethclient.Client, vLog types.Log) {
+	runWsLogListener("[BSC-WS]", wsURL, query, func(client *ethclient.Client, vLog types.Log) {
 		if len(vLog.Topics) < 3 {
 			return
 		}

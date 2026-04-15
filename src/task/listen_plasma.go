@@ -54,7 +54,7 @@ func StartPlasmaWebSocketListener() {
 		Topics:    [][]common.Hash{},
 	}
 
-	runEvmWsLogListener("[PLASMA-WS]", wsURL, query, func(client *ethclient.Client, vLog types.Log) {
+	runWsLogListener("[PLASMA-WS]", wsURL, query, func(client *ethclient.Client, vLog types.Log) {
 		if len(vLog.Topics) < 3 {
 			return
 		}

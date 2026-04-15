@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-func runEvmWsLogListener(logPrefix, wsURL string, query ethereum.FilterQuery, handleLog func(*ethclient.Client, types.Log)) {
+func runWsLogListener(logPrefix, wsURL string, query ethereum.FilterQuery, handleLog func(*ethclient.Client, types.Log)) {
 	const (
 		minBackoff = 2 * time.Second
 		maxBackoff = 60 * time.Second
