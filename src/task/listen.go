@@ -11,17 +11,11 @@ func Start() {
 	go StartBscWebSocketListener()
 	go StartPolygonWebSocketListener()
 	go StartPlasmaWebSocketListener()
+	go StartTronBlockScannerListener()
 
 	c := cron.New()
-	// trc20钱包监听
-	_, err := c.AddJob("@every 5s", ListenTrc20Job{})
-	if err != nil {
-		log.Sugar.Errorf("[task] Failed to add ListenTrc20Job: %v", err)
-		return
-	}
-	log.Sugar.Info("[task] ListenTrc20Job scheduled successfully (@every 5s)")
 	// solana钱包监听
-	_, err = c.AddJob("@every 5s", ListenSolJob{})
+	_, err := c.AddJob("@every 5s", ListenSolJob{})
 	if err != nil {
 		log.Sugar.Errorf("[task] Failed to add ListenSolJob: %v", err)
 		return
